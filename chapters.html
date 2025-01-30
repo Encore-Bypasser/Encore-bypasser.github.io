@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chapter Management</title>
+    <style>
+        body {
+            font-family: "Courier New", Courier, monospace;
+            background-color: #121212;
+            color: #4ecdc4;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1, h2 {
+            color: #4ecdc4;
+            text-align: center;
+        }
+
+        .card {
+            background: rgb(44, 44, 44);
+            border-radius: 4px;
+            margin-bottom: 20px;
+            padding: 15px;
+        }
+
+        .login-section {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background-color: rgb(44, 44, 44);
+            color: #4ecdc4;
+            border: 1px solid rgb(100, 100, 100);
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: rgb(60, 60, 60);
+            color: #4ecdc4;
+            border: none;
+            padding: 8px 12px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: rgb(80, 80, 80);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background-color: rgb(44, 44, 44);
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 4px;
+            width: 80%;
+            max-width: 500px;
+        }
+
+        .close {
+            float: right;
+            cursor: pointer;
+            font-size: 24px;
+        }
+
+        .request-list {
+            margin-top: 20px;
+        }
+
+        .request-item {
+            border: 1px solid rgb(100, 100, 100);
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .status-pending {
+            color: #ffd700;
+        }
+
+        .status-approved {
+            color: #4caf50;
+        }
+
+        .status-rejected {
+            color: #ff6b6b;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chapter Management</h1>
+
+    <!-- Login Section -->
+    <div class="login-section">
+        <span id="userStatus">Not logged in</span>
+        <button id="loginBtn" onclick="showLoginModal()">Login</button>
+        <button id="logoutBtn" onclick="logout()" class="hidden">Logout</button>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="hideLoginModal()">&times;</span>
+            <h2>Login</h2>
+            <div class="form-group">
+                <input type="text" id="username" placeholder="Username">
+            </div>
+            <div class="form-group">
+                <input type="password" id="password" placeholder="Password">
+            </div>
+            <button onclick="login()">Login</button>
+        </div>
+    </div>
+
+    <!-- Request Form -->
+    <div class="card">
+        <h2>Submit New Series Request</h2>
+        <div class="form-group">
+            <input type="text" id="seriesName" placeholder="Series Name">
+        </div>
+        <div class="form-group">
+            <input type="number" id="chapter" placeholder="Chapter Number">
+        </div>
+        <div class="form-group">
+            <input type="number" id="startNumber" placeholder="Start Number">
+        </div>
+        <div class="form-group">
+            <input type="number" id="frameCount" placeholder="Frame Count">
+        </div>
+        <div class="form-group">
+            <input type="text" id="filePattern" placeholder="File Pattern" value="01-optimized.webp">
+        </div>
+        <button onclick="submitRequest()">Submit Request</button>
+    </div>
+
+    <!-- Admin Section (visible only when logged in) -->
+    <div id="adminSection" class="hidden">
+        <div class="card">
+            <h2>Pending Requests</h2>
+            <div id="pendingRequests" class="request-list">
+                <!-- Pending requests will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Current Series List -->
+    <div class="card">
+        <h2>Current Series</h2>
+        <div id="seriesList">
+            <!-- Series list will be populated here -->
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('token');
+        const API_URL = 'https://mountainous-young-raven.glitch.me'; // Replace with your server URL
+
+        // Check login status on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateLoginStatus();
+            loadSeriesData();
+            if (token) {
+                loadPendingRequests();
+            }
+        });
+
+        function updateLoginStatus() {
+            const isLoggedIn = !!token;
+            document.getElementById('userStatus').textContent = isLoggedIn ? 'Logged in as Admin' : 'Not logged in';
+            document.getElementById('loginBtn').classList.toggle('hidden', isLoggedIn);
+            document.getElementById('logoutBtn').classList.toggle('hidden', !isLoggedIn);
+            document.getElementById('adminSection').classList.toggle('hidden', !isLoggedIn);
+        }
+
+        // Modal functions
+        function showLoginModal() {
+            document.getElementById('loginModal').style.display = 'block';
+        }
+
+        function hideLoginModal() {
+            document.getElementById('loginModal').style.display = 'none';
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    token = data.token;
+                    localStorage.setItem('token', token);
+                    hideLoginModal();
+                    updateLoginStatus();
+                    loadPendingRequests();
+                } else {
+                    alert('Invalid credentials');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Error during login');
+            }
+        }
+
+        function logout() {
+            token = null;
+            localStorage.removeItem('token');
+            updateLoginStatus();
+        }
+
+        async function submitRequest() {
+            const request = {
+                series: document.getElementById('seriesName').value,
+                chapter: document.getElementById('chapter').value,
+                startNumber: document.getElementById('startNumber').value,
+                frameCount: document.getElementById('frameCount').value,
+                filePattern: document.getElementById('filePattern').value || "01-optimized.webp",
+                id: Date.now().toString() // Simple unique ID
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/request`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(request)
+                });
+
+                if (response.ok) {
+                    alert('Request submitted successfully');
+                    clearForm();
+                    if (token) {
+                        loadPendingRequests();
+                    }
+                } else {
+                    alert('Error submitting request');
+                }
+            } catch (error) {
+                console.error('Submit error:', error);
+                alert('Error submitting request');
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('seriesName').value = '';
+            document.getElementById('chapter').value = '';
+            document.getElementById('startNumber').value = '';
+            document.getElementById('frameCount').value = '';
+            document.getElementById('filePattern').value = '01-optimized.webp';
+        }
+
+        async function loadPendingRequests() {
+            if (!token) return;
+
+            try {
+                const response = await fetch(`${API_URL}/pending-requests`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const requests = await response.json();
+                    displayPendingRequests(requests);
+                } else {
+                    console.error('Error loading pending requests');
+                }
+            } catch (error) {
+                console.error('Load pending requests error:', error);
+            }
+        }
+
+        function displayPendingRequests(requests) {
+            const container = document.getElementById('pendingRequests');
+            container.innerHTML = requests.length === 0 ? 
+                '<p>No pending requests</p>' : 
+                requests.map(request => `
+                    <div class="request-item">
+                        <p>Series: ${request.series}</p>
+                        <p>Chapter: ${request.chapter}</p>
+                        <p>Start Number: ${request.startNumber}</p>
+                        <p>Frame Count: ${request.frameCount}</p>
+                        <p>File Pattern: ${request.filePattern}</p>
+                        <button onclick="approveRequest('${request.id}')">Approve</button>
+                        <button onclick="rejectRequest('${request.id}')">Reject</button>
+                    </div>
+                `).join('');
+        }
+
+        async function approveRequest(requestId) {
+            try {
+                const response = await fetch(`${API_URL}/approve-request`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ requestId })
+                });
+
+                if (response.ok) {
+                    alert('Request approved');
+                    loadPendingRequests();
+                    loadSeriesData();
+                } else {
+                    alert('Error approving request');
+                }
+            } catch (error) {
+                console.error('Approve request error:', error);
+                alert('Error approving request');
+            }
+        }
+
+        async function rejectRequest(requestId) {
+            try {
+                const response = await fetch(`${API_URL}/reject-request`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ requestId })
+                });
+
+                if (response.ok) {
+                    alert('Request rejected');
+                    loadPendingRequests();
+                } else {
+                    alert('Error rejecting request');
+                }
+            } catch (error) {
+                console.error('Reject request error:', error);
+                alert('Error rejecting request');
+            }
+        }
+
+        async function loadSeriesData() {
+            try {
+                const response = await fetch('chapters.json');
+                if (response.ok) {
+                    const data = await response.json();
+                    displaySeriesList(data);
+                }
+            } catch (error) {
+                console.error('Error loading series data:', error);
+            }
+        }
+
+        function displaySeriesList(series) {
+            const container = document.getElementById('seriesList');
+            container.innerHTML = series.map(item => `
+                <div class="request-item">
+                    <h3>${item.series}</h3>
+                    ${item.chapters.map(chapter => `
+                        <p>Chapter: ${chapter.chapter}</p>
+                        <p>Start Number: ${chapter.startNumber}</p>
+                        <p>Frame Count: ${chapter.frameCount}</p>
+                        <p>File Pattern: ${chapter.filePattern}</p>
+                    `).join('')}
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
