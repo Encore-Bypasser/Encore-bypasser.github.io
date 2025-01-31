@@ -3,191 +3,499 @@
 <head>
     <meta charset="UTF-8">
     <title>Chapter Management</title>
+    <script>
+        const API_URL = 'https://mountainous-young-raven.glitch.me';
+        let token = localStorage.getItem('token');
+        const GITHUB_CONFIG = {
+            REPO: 'psycho980/psycho980.github.io',
+            BRANCH: 'main'
+        };
+        let seriesData = [];
+        let editingIndex = null;
+
+        // Authentication Functions
+        function updateLoginStatus() {
+            const isLoggedIn = !!token;
+            document.getElementById('userStatus').textContent = isLoggedIn ? 'Logged in as Admin' : 'Not logged in';
+            document.getElementById('loginBtn').classList.toggle('hidden', isLoggedIn);
+            document.getElementById('logoutBtn').classList.toggle('hidden', !isLoggedIn);
+            document.getElementById('adminSection').classList.toggle('hidden', !isLoggedIn);
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    token = data.token;
+                    localStorage.setItem('token', token);
+                    hideLoginModal();
+                    updateLoginStatus();
+                    loadPendingRequests();
+                } else {
+                    alert('Invalid credentials');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Error during login');
+            }
+        }
+
+        function logout() {
+            token = null;
+            localStorage.removeItem('token');
+            updateLoginStatus();
+        }
+
+        // Pending Requests Functions
+        async function loadPendingRequests() {
+            if (!token) return;
+
+            try {
+                const response = await fetch(`${API_URL}/pending-requests`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const requests = await response.json();
+                    displayPendingRequests(requests);
+                } else {
+                    console.error('Error loading pending requests');
+                }
+            } catch (error) {
+                console.error('Load pending requests error:', error);
+            }
+        }
+
+        function displayPendingRequests(requests) {
+            const container = document.getElementById('pendingRequests');
+            container.innerHTML = requests.length === 0 ? 
+                '<p>No pending requests</p>' : 
+                requests.map(request => `
+                    <div class="request-item">
+                        <p>Series: ${request.series}</p>
+                        <p>Chapter: ${request.chapter}</p>
+                        <p>Start Number: ${request.startNumber}</p>
+                        <p>Frame Count: ${request.frameCount}</p>
+                        <p>File Pattern: ${request.filePattern}</p>
+                        <button onclick="approveRequest('${request.id}')">Approve</button>
+                        <button onclick="rejectRequest('${request.id}')">Reject</button>
+                    </div>
+                `).join('');
+        }
+
+        async function approveRequest(requestId) {
+            try {
+                const response = await fetch(`${API_URL}/approve-request`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ requestId })
+                });
+
+                if (response.ok) {
+                    alert('Request approved');
+                    loadPendingRequests();
+                    loadSeriesData();
+                } else {
+                    alert('Error approving request');
+                }
+            } catch (error) {
+                console.error('Approve request error:', error);
+                alert('Error approving request');
+            }
+        }
+
+        async function rejectRequest(requestId) {
+            try {
+                const response = await fetch(`${API_URL}/reject-request`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ requestId })
+                });
+
+                if (response.ok) {
+                    alert('Request rejected');
+                    loadPendingRequests();
+                } else {
+                    alert('Error rejecting request');
+                }
+            } catch (error) {
+                console.error('Reject request error:', error);
+                alert('Error rejecting request');
+            }
+        }
+
+        // Existing Series Data Functions
+        async function loadSeriesData() {
+            try {
+                const response = await fetch('chapters.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                seriesData = await response.json();
+            } catch (error) {
+                console.error('Error loading series data:', error);
+                // Fallback to default data if fetch fails
+                seriesData = [
+                    {
+                        "series": "The Knight King Who Returned with a God [ Default]",
+                        "chapters": [
+                            { "chapter": 96, "startNumber": 266584, "frameCount": 10, "filePattern": "01-optimized.webp" }
+                        ]
+                    }
+                ];
+            }
+            renderSeriesList();
+        }
+
+        function renderSeriesList() {
+            const seriesList = document.getElementById('seriesList');
+            if (!seriesList) {
+                console.error('seriesList element not found');
+                return;
+            }
+
+            seriesList.innerHTML = '';
+
+            if (seriesData.length === 0) {
+                seriesList.innerHTML = '<p>No series data available.</p>';
+                return;
+            }
+
+            seriesData.forEach((series, seriesIndex) => {
+                const seriesCard = document.createElement('div');
+                seriesCard.className = 'card';
+                seriesCard.innerHTML = `
+                    <div class="card__title">${series.series}</div>
+                    <div class="card__data">
+                        <div class="card__left">
+                            <div class="item">Chapter</div>
+                            <div class="item">Start Number</div>
+                            <div class="item">Frame Count</div>
+                            <div class="item">File Pattern</div>
+                        </div>
+                        <div class="card__right">
+                            ${series.chapters.map(chapter => `
+                                <div class="item">${chapter.chapter}</div>
+                                <div class="item">${chapter.startNumber}</div>
+                                <div class="item">${chapter.frameCount}</div>
+                                <div class="item">${chapter.filePattern || "01-optimized.webp"}</div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <button onclick="prepareEdit(${seriesIndex})">Edit</button>
+                        <button onclick="removeSeries(${seriesIndex})">Remove</button>
+                    </div>
+                `;
+                seriesList.appendChild(seriesCard);
+            });
+        }
+
+        function prepareEdit(index) {
+            const series = seriesData[index];
+            editingIndex = index;
+            document.getElementById('seriesName').value = series.series;
+            const chapter = series.chapters[0];
+            document.getElementById('chapter').value = chapter.chapter;
+            document.getElementById('startNumber').value = chapter.startNumber;
+            document.getElementById('frameCount').value = chapter.frameCount;
+            document.getElementById('filePattern').value = chapter.filePattern || "01-optimized.webp";
+            document.getElementById('addButton').textContent = 'Update Series';
+        }
+
+        function addSeries() {
+            const seriesName = document.getElementById('seriesName').value.trim();
+            const chapter = parseInt(document.getElementById('chapter').value);
+            const startNumber = parseInt(document.getElementById('startNumber').value);
+            const frameCount = parseInt(document.getElementById('frameCount').value);
+            const filePattern = document.getElementById('filePattern').value.trim() || "01-optimized.webp";
+
+            if (!seriesName || isNaN(chapter) || isNaN(startNumber) || isNaN(frameCount)) {
+                alert('Please fill in all fields correctly.');
+                return;
+            }
+
+            if (editingIndex !== null) {
+                seriesData[editingIndex] = {
+                    "series": seriesName,
+                    "chapters": [{ chapter, startNumber, frameCount, filePattern }]
+                };
+                editingIndex = null;
+                document.getElementById('addButton').textContent = 'Add Series';
+            } else {
+                seriesData.push({
+                    "series": seriesName,
+                    "chapters": [{ chapter, startNumber, frameCount, filePattern }]
+                });
+            }
+            renderSeriesList();
+            saveToJson();
+        }
+
+        function removeSeries(seriesIndex) {
+            if (confirm('Are you sure you want to remove this series?')) {
+                seriesData.splice(seriesIndex, 1);
+                renderSeriesList();
+                saveToJson();
+            }
+        }
+
+        async function saveToJson() {
+            const jsonContent = JSON.stringify(seriesData, null, 2);
+            const base64Content = btoa(unescape(encodeURIComponent(jsonContent)));
+
+            try {
+                const response = await fetch(`${API_URL}/chapter`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        content: base64Content,
+                        sha: 'existing-file-sha'
+                    })
+                });
+
+                if (response.ok) {
+                    alert('Successfully updated chapters.json on GitHub!');
+                } else {
+                    alert('Failed to update chapters.json.');
+                }
+            } catch (error) {
+                console.error('Save to JSON error:', error);
+                alert('Error updating chapters.json');
+            }
+        }
+
+        // Request Submission Function
+        async function submitRequest() {
+            const request = {
+                series: document.getElementById('seriesName').value,
+                chapter: document.getElementById('chapter').value,
+                startNumber: document.getElementById('startNumber').value,
+                frameCount: document.getElementById('frameCount').value,
+                filePattern: document.getElementById('filePattern').value || "01-optimized.webp",
+                id: Date.now().toString()
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/request`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(request)
+                });
+
+                if (response.ok) {
+                    alert('Request submitted successfully');
+                    if (token) {
+                        loadPendingRequests();
+                    }
+                } else {
+                    alert('Error submitting request');
+                }
+            } catch (error) {
+                console.error('Submit error:', error);
+                alert('Error submitting request');
+            }
+        }
+
+        // Modal and Login Functions
+        function showLoginModal() {
+            document.getElementById('loginModal').style.display = 'block';
+        }
+
+        function hideLoginModal() {
+            document.getElementById('loginModal').style.display = 'none';
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateLoginStatus();
+            loadSeriesData();
+            if (token) {
+                loadPendingRequests();
+            }
+        });
+    </script>
     <style>
-body {
-        font-family: "Courier New", Courier, monospace;
-        background-color: #121212;
-        color: #4ecdc4;
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 20px;
-    }
+        body {
+            font-family: "Courier New", Courier, monospace;
+            background-color: #121212;
+            color: #4ecdc4;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
 
-    h1, h2 {
-        color: #4ecdc4;
-        text-align: center;
-    }
+        h1, h2 {
+            color: #4ecdc4;
+            text-align: center;
+        }
 
-    /* Card Styles */
-    .card {
-        width: 100%;
-        background: rgb(44, 44, 44);
-        border-radius: 4px;
-        overflow: hidden;
-        margin-bottom: 15px;
-    }
+        /* Login Section Styles */
+        .login-section {
+            text-align: right;
+            margin-bottom: 20px;
+        }
 
-    .card__title {
-        color: #4ecdc4;
-        font-weight: bold;
-        padding: 10px;
-        border-bottom: 1px solid rgb(167, 159, 159);
-        font-size: 1rem;
-        text-align: left;
-    }
+        .hidden {
+            display: none;
+        }
 
-    .card__data {
-        font-size: 0.9rem;
-        display: flex;
-        border-right: 1px solid rgb(203, 203, 203);
-        border-left: 1px solid rgb(203, 203, 203);
-        border-bottom: 1px solid rgb(203, 203, 203);
-    }
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+        }
 
-    .card__right {
-        width: 50%;
-        border-left: 1px solid rgb(203, 203, 203);
-        text-align: left;
-    }
+        .modal-content {
+            background-color: rgb(44, 44, 44);
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 4px;
+            width: 80%;
+            max-width: 500px;
+        }
 
-    .card__left {
-        width: 50%;
-        text-align: left;
-    }
+        .close {
+            float: right;
+            cursor: pointer;
+            font-size: 24px;
+        }
 
-    .item {
-        padding: 5px;
-        background-color: rgb(30, 30, 30);
-        color: white;
-        text-align: left;
-    }
+        /* Card Styles */
+        .card {
+            width: 100%;
+            background: rgb(44, 44, 44);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
 
-    .card__right .item {
-        padding-left: 10px;
-    }
+        .card__title {
+            color: #4ecdc4;
+            font-weight: bold;
+            padding: 10px;
+            border-bottom: 1px solid rgb(167, 159, 159);
+            font-size: 1rem;
+            text-align: left;
+        }
 
-    .card__left .item {
-        padding-right: 10px;
-    }
+        .card__data {
+            font-size: 0.9rem;
+            display: flex;
+            border-right: 1px solid rgb(203, 203, 203);
+            border-left: 1px solid rgb(203, 203, 203);
+            border-bottom: 1px solid rgb(203, 203, 203);
+        }
 
-    .item:nth-child(even) {
-        background: rgb(50, 50, 50);
-    }
+        .card__right {
+            width: 50%;
+            border-left: 1px solid rgb(203, 203, 203);
+            text-align: left;
+        }
 
-    .card-actions {
-        display: flex;
-        justify-content: space-between;
-        padding: 10px;
-        background: rgb(30, 30, 30);
-    }
+        .card__left {
+            width: 50%;
+            text-align: left;
+        }
 
-    /* Request Item Styles */
-    .request-item {
-        border: 1px solid rgb(100, 100, 100);
-        padding: 10px;
-        margin-bottom: 10px;
-        border-radius: 4px;
-        background: rgb(44, 44, 44);
-        color: #4ecdc4;
-    }
+        .item {
+            padding: 5px;
+            background-color: rgb(30, 30, 30);
+            color: white;
+            text-align: left;
+        }
 
-    /* Existing Styles */
-    .login-section {
-        text-align: right;
-        margin-bottom: 20px;
-    }
+        .card__right .item {
+            padding-left: 10px;
+        }
 
-    .form-group {
-        margin-bottom: 15px;
-    }
+        .card__left .item {
+            padding-right: 10px;
+        }
 
-    input {
-        width: 100%;
-        padding: 8px;
-        margin: 5px 0;
-        background-color: rgb(44, 44, 44);
-        color: #4ecdc4;
-        border: 1px solid rgb(100, 100, 100);
-        border-radius: 4px;
-    }
+        .item:nth-child(even) {
+            background: rgb(50, 50, 50);
+        }
 
-    button {
-        background-color: rgb(60, 60, 60);
-        color: #4ecdc4;
-        border: none;
-        padding: 8px 12px;
-        margin: 5px;
-        border-radius: 4px;
-        cursor: pointer;
-    }
+        .card-actions {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: rgb(30, 30, 30);
+        }
 
-    button:hover {
-        background-color: rgb(80, 80, 80);
-    }
+        /* Request Item Styles */
+        .request-item {
+            border: 1px solid rgb(100, 100, 100);
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            background: rgb(44, 44, 44);
+            color: #4ecdc4;
+        }
 
-    /* Modal Styles */
-    .modal {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.7);
-        z-index: 1000;
-    }
+        /* Input Styles */
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            background-color: rgb(44, 44, 44);
+            color: #4ecdc4;
+            border: 1px solid rgb(100, 100, 100);
+            border-radius: 4px;
+        }
 
-    .modal-content {
-        background-color: rgb(44, 44, 44);
-        margin: 15% auto;
-        padding: 20px;
-        border-radius: 4px;
-        width: 80%;
-        max-width: 500px;
-    }
+        /* Button Styles */
+        button {
+            background-color: rgb(60, 60, 60);
+            color: #4ecdc4;
+            border: none;
+            padding: 8px 12px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
 
-    .close {
-        float: right;
-        cursor: pointer;
-        font-size: 24px;
-    }
+        button:hover {
+            background-color: rgb(80, 80, 80);
+        }
 
-    .request-list {
-        margin-top: 20px;
-    }
-
-    .status-pending {
-        color: #ffd700;
-    }
-
-    .status-approved {
-        color: #4caf50;
-    }
-
-    .status-rejected {
-        color: #ff6b6b;
-    }
-
-    .hidden {
-        display: none;
-    }
-
-    /* Series List Styling */
-    #seriesList .request-item h3 {
-        color: #4ecdc4;
-        margin-bottom: 10px;
-    }
-
-    #seriesList .request-item p {
-        margin: 5px 0;
-        color: white;
-    }
-
+        /* Admin Section Styles */
+        #adminSection {
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
-    <h1>Chapter Management</h1>
-
     <!-- Login Section -->
     <div class="login-section">
         <span id="userStatus">Not logged in</span>
@@ -244,381 +552,5 @@ body {
     <div class="series-container" id="seriesList">
         <!-- Will be populated dynamically -->
     </div>
-
-    <script>
-let token = localStorage.getItem('token');
-    const API_URL = 'https://mountainous-young-raven.glitch.me';
-    let seriesData = [];
-    let editingIndex = null;
-
-    const GITHUB_CONFIG = {
-        REPO: 'psycho980/psycho980.github.io',
-        BRANCH: 'main'
-    };
-
-    // Check login status on page load
-    document.addEventListener('DOMContentLoaded', () => {
-        updateLoginStatus();
-        loadSeriesData();
-        if (token) {
-            loadPendingRequests();
-        }
-    });
-
-    function updateLoginStatus() {
-        const isLoggedIn = !!token;
-        document.getElementById('userStatus').textContent = isLoggedIn ? 'Logged in as Admin' : 'Not logged in';
-        document.getElementById('loginBtn').classList.toggle('hidden', isLoggedIn);
-        document.getElementById('logoutBtn').classList.toggle('hidden', !isLoggedIn);
-        document.getElementById('adminSection').classList.toggle('hidden', !isLoggedIn);
-    }
-
-    // Modal functions
-    function showLoginModal() {
-        document.getElementById('loginModal').style.display = 'block';
-    }
-
-    function hideLoginModal() {
-        document.getElementById('loginModal').style.display = 'none';
-    }
-
-    // Authentication Functions
-    async function login() {
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-
-        try {
-            const response = await fetch(`${API_URL}/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ username, password })
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                token = data.token;
-                localStorage.setItem('token', token);
-                hideLoginModal();
-                updateLoginStatus();
-                loadPendingRequests();
-            } else {
-                alert('Invalid credentials');
-            }
-        } catch (error) {
-            console.error('Login error:', error);
-            alert('Error during login');
-        }
-    }
-
-    function logout() {
-        token = null;
-        localStorage.removeItem('token');
-        updateLoginStatus();
-    }
-
-    // Series Data Management
-    async function loadSeriesData() {
-        try {
-            const response = await fetch('https://raw.githubusercontent.com/Psycho980/Psycho980.github.io/refs/heads/main/chapters.json');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            seriesData = await response.json();
-            renderSeriesList();
-            displaySeriesList(seriesData);
-        } catch (error) {
-            console.error('Error loading series data:', error);
-            // Fallback to default data if fetch fails
-            seriesData = [
-                {
-                    "series": "The Knight King Who Returned with a God [ Default]",
-                    "chapters": [
-                        { "chapter": 96, "startNumber": 266584, "frameCount": 10, "filePattern": "01-optimized.webp" }
-                    ]
-                }
-            ];
-            renderSeriesList();
-            displaySeriesList(seriesData);
-        }
-    }
-
-    function renderSeriesList() {
-        const seriesList = document.getElementById('seriesList');
-        if (!seriesList) {
-            console.error('seriesList element not found');
-            return;
-        }
-
-        seriesList.innerHTML = '';
-
-        if (seriesData.length === 0) {
-            seriesList.innerHTML = '<p>No series data available.</p>';
-            return;
-        }
-
-        seriesData.forEach((series, seriesIndex) => {
-            const seriesCard = document.createElement('div');
-            seriesCard.className = 'card';
-            seriesCard.innerHTML = `
-                <div class="card__title">${series.series}</div>
-                <div class="card__data">
-                    <div class="card__left">
-                        <div class="item">Chapter</div>
-                        <div class="item">Start Number</div>
-                        <div class="item">Frame Count</div>
-                        <div class="item">File Pattern</div>
-                    </div>
-                    <div class="card__right">
-                        ${series.chapters.map(chapter => `
-                            <div class="item">${chapter.chapter}</div>
-                            <div class="item">${chapter.startNumber}</div>
-                            <div class="item">${chapter.frameCount}</div>
-                            <div class="item">${chapter.filePattern || "01-optimized.webp"}</div>
-                        `).join('')}
-                    </div>
-                </div>
-                <div class="card-actions">
-                    <button onclick="prepareEdit(${seriesIndex})">Edit</button>
-                    <button onclick="removeSeries(${seriesIndex})">Remove</button>
-                </div>
-            `;
-            seriesList.appendChild(seriesCard);
-        });
-    }
-
-    function prepareEdit(index) {
-        const series = seriesData[index];
-        editingIndex = index;
-        document.getElementById('seriesName').value = series.series;
-        const chapter = series.chapters[0];
-        document.getElementById('chapter').value = chapter.chapter;
-        document.getElementById('startNumber').value = chapter.startNumber;
-        document.getElementById('frameCount').value = chapter.frameCount;
-        document.getElementById('filePattern').value = chapter.filePattern || "01-optimized.webp";
-        document.getElementById('addButton').textContent = 'Update Series';
-    }
-
-    function addSeries() {
-        const seriesName = document.getElementById('seriesName').value.trim();
-        const chapter = parseInt(document.getElementById('chapter').value);
-        const startNumber = parseInt(document.getElementById('startNumber').value);
-        const frameCount = parseInt(document.getElementById('frameCount').value);
-        const filePattern = document.getElementById('filePattern').value.trim() || "01-optimized.webp";
-
-        if (!seriesName || isNaN(chapter) || isNaN(startNumber) || isNaN(frameCount)) {
-            alert('Please fill in all fields correctly.');
-            return;
-        }
-
-        if (editingIndex !== null) {
-            seriesData[editingIndex] = {
-                "series": seriesName,
-                "chapters": [{ chapter, startNumber, frameCount, filePattern }]
-            };
-            editingIndex = null;
-            document.getElementById('addButton').textContent = 'Add Series';
-        } else {
-            seriesData.push({
-                "series": seriesName,
-                "chapters": [{ chapter, startNumber, frameCount, filePattern }]
-            });
-        }
-        renderSeriesList();
-        saveToJson();
-    }
-
-    function removeSeries(seriesIndex) {
-        if (confirm('Are you sure you want to remove this series?')) {
-            seriesData.splice(seriesIndex, 1);
-            renderSeriesList();
-            saveToJson();
-        }
-    }
-
-    async function saveToJson() {
-        const jsonContent = JSON.stringify(seriesData, null, 2);
-        const base64Content = btoa(unescape(encodeURIComponent(jsonContent)));
-
-        try {
-            const response = await fetch(`${API_URL}/chapter`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    content: base64Content,
-                    sha: 'existing-file-sha'
-                })
-            });
-
-            if (response.ok) {
-                alert('Successfully updated chapters.json on GitHub!');
-            } else {
-                alert('Failed to update chapters.json.');
-            }
-        } catch (error) {
-            console.error('Save to JSON error:', error);
-            alert('Error updating chapters.json');
-        }
-    }
-
-    // Request Submission and Management
-    async function submitRequest() {
-        const request = {
-            series: document.getElementById('seriesName').value,
-            chapter: document.getElementById('chapter').value,
-            startNumber: document.getElementById('startNumber').value,
-            frameCount: document.getElementById('frameCount').value,
-            filePattern: document.getElementById('filePattern').value || "01-optimized.webp",
-            id: Date.now().toString()
-        };
-
-        try {
-            const response = await fetch(`${API_URL}/request`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(request)
-            });
-
-            if (response.ok) {
-                alert('Request submitted successfully');
-                clearForm();
-                if (token) {
-                    loadPendingRequests();
-                }
-            } else {
-                alert('Error submitting request');
-            }
-        } catch (error) {
-            console.error('Submit error:', error);
-            alert('Error submitting request');
-        }
-    }
-
-    function clearForm() {
-        document.getElementById('seriesName').value = '';
-        document.getElementById('chapter').value = '';
-        document.getElementById('startNumber').value = '';
-        document.getElementById('frameCount').value = '';
-        document.getElementById('filePattern').value = '01-optimized.webp';
-    }
-
-    async function loadPendingRequests() {
-        if (!token) return;
-
-        try {
-            const response = await fetch(`${API_URL}/pending-requests`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (response.ok) {
-                const requests = await response.json();
-                displayPendingRequests(requests);
-            } else {
-                console.error('Error loading pending requests');
-            }
-        } catch (error) {
-            console.error('Load pending requests error:', error);
-        }
-    }
-
-    function displayPendingRequests(requests) {
-        const container = document.getElementById('pendingRequests');
-        container.innerHTML = requests.length === 0 ? 
-            '<p>No pending requests</p>' : 
-            requests.map(request => `
-                <div class="request-item">
-                    <p>Series: ${request.series}</p>
-                    <p>Chapter: ${request.chapter}</p>
-                    <p>Start Number: ${request.startNumber}</p>
-                    <p>Frame Count: ${request.frameCount}</p>
-                    <p>File Pattern: ${request.filePattern}</p>
-                    <button onclick="approveRequest('${request.id}')">Approve</button>
-                    <button onclick="rejectRequest('${request.id}')">Reject</button>
-                </div>
-            `).join('');
-    }
-
-    async function approveRequest(requestId) {
-        try {
-            const response = await fetch(`${API_URL}/approve-request`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ requestId })
-            });
-
-            if (response.ok) {
-                alert('Request approved');
-                loadPendingRequests();
-                loadSeriesData();
-            } else {
-                alert('Error approving request');
-            }
-        } catch (error) {
-            console.error('Approve request error:', error);
-            alert('Error approving request');
-        }
-    }
-
-    async function rejectRequest(requestId) {
-        try {
-            const response = await fetch(`${API_URL}/reject-request`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ requestId })
-            });
-
-            if (response.ok) {
-                alert('Request rejected');
-                loadPendingRequests();
-            } else {
-                alert('Error rejecting request');
-            }
-        } catch (error) {
-            console.error('Reject request error:', error);
-            alert('Error rejecting request');
-        }
-    }
-
-    function displaySeriesList(series) {
-        const container = document.getElementById('seriesList');
-        container.innerHTML = series.map(item => `
-            <div class="request-item">
-                <h3>${item.series}</h3>
-                ${item.chapters.map(chapter => `
-                    <p>Chapter: ${chapter.chapter}</p>
-                    <p>Start Number: ${chapter.startNumber}</p>
-                    <p>Frame Count: ${chapter.frameCount}</p>
-                    <p>File Pattern: ${chapter.filePattern}</p>
-                `).join('')}
-            </div>
-        `).join('');
-    }
-
-    // Expose functions to global scope for inline event handlers
-    window.showLoginModal = showLoginModal;
-    window.hideLoginModal = hideLoginModal;
-    window.login = login;
-    window.logout = logout;
-    window.submitRequest = submitRequest;
-    window.prepareEdit = prepareEdit;
-    window.removeSeries = removeSeries;
-    window.addSeries = addSeries;
-    window.approveRequest = approveRequest;
-    window.rejectRequest = rejectRequest;
-    window.saveToJson = saveToJson;
-    </script>
 </body>
 </html>
