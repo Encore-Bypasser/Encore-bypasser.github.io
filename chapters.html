@@ -144,35 +144,40 @@
         }
 
         // Existing Series Data Functions
-        async function loadSeriesData() {
-            try {
-                const response = await fetch('https://raw.githubusercontent.com/Psycho980/Psycho980.github.io/refs/heads/main/chapters.json');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                seriesData = await response.json();
-            } catch (error) {
-                console.error('Error loading series data:', error);
-                // Fallback to default data if fetch fails
-                seriesData = [
-                    {
-                        "series": "The Knight King Who Returned with a God [ Default]",
-                        "chapters": [
-                            { "chapter": 96, "startNumber": 266584, "frameCount": 10, "filePattern": "01-optimized.webp" }
-                        ]
-                    }
-                ];
-            }
-            renderSeriesList();
+async function loadSeriesData() {
+    try {
+        const response = await fetch('https://raw.githubusercontent.com/Psycho980/Psycho980.github.io/refs/heads/main/chapters.json');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-
-        function renderSeriesList() {
-            const seriesList = document.getElementById('seriesList');
-            if (!seriesList) {
-                console.error('seriesList element not found');
-                return;
+        seriesData = await response.json();
+    } catch (error) {
+        console.error('Error loading series data:', error);
+        // Fallback to default data if fetch fails
+        seriesData = [
+            {
+                "series": "The Knight King Who Returned with a God [ Default]",
+                "chapters": [
+                    { "chapter": 96, "startNumber": 266584, "frameCount": 10, "filePattern": "01-optimized.webp" }
+                ]
             }
+        ];
+    }
+    renderSeriesList();
+}
 
+function renderSeriesList() {
+    const seriesList = document.getElementById('seriesList');
+    if (!seriesList) {
+        console.error('seriesList element not found');
+        return;
+    }
+
+    // Check if the user is logged in
+    if (!token) {
+        seriesList.innerHTML = '<p>You must be logged in as an admin to view the series list.</p>';
+        return;
+    }
             seriesList.innerHTML = '';
 
             if (seriesData.length === 0) {
@@ -180,35 +185,35 @@
                 return;
             }
 
-            seriesData.forEach((series, seriesIndex) => {
-                const seriesCard = document.createElement('div');
-                seriesCard.className = 'card';
-                seriesCard.innerHTML = `
-                    <div class="card__title">${series.series}</div>
-                    <div class="card__data">
-                        <div class="card__left">
-                            <div class="item">Chapter</div>
-                            <div class="item">Start Number</div>
-                            <div class="item">Frame Count</div>
-                            <div class="item">File Pattern</div>
-                        </div>
-                        <div class="card__right">
-                            ${series.chapters.map(chapter => `
-                                <div class="item">${chapter.chapter}</div>
-                                <div class="item">${chapter.startNumber}</div>
-                                <div class="item">${chapter.frameCount}</div>
-                                <div class="item">${chapter.filePattern || "01-optimized.webp"}</div>
-                            `).join('')}
-                        </div>
-                    </div>
-                    <div class="card-actions">
-                        <button onclick="prepareEdit(${seriesIndex})">Edit</button>
-                        <button onclick="removeSeries(${seriesIndex})">Remove</button>
-                    </div>
-                `;
-                seriesList.appendChild(seriesCard);
-            });
-        }
+    seriesData.forEach((series, seriesIndex) => {
+        const seriesCard = document.createElement('div');
+        seriesCard.className = 'card';
+        seriesCard.innerHTML = `
+            <div class="card__title">${series.series}</div>
+            <div class="card__data">
+                <div class="card__left">
+                    <div class="item">Chapter</div>
+                    <div class="item">Start Number</div>
+                    <div class="item">Frame Count</div>
+                    <div class="item">File Pattern</div>
+                </div>
+                <div class="card__right">
+                    ${series.chapters.map(chapter => `
+                        <div class="item">${chapter.chapter}</div>
+                        <div class="item">${chapter.startNumber}</div>
+                        <div class="item">${chapter.frameCount}</div>
+                        <div class="item">${chapter.filePattern || "01-optimized.webp"}</div>
+                    `).join('')}
+                </div>
+            </div>
+            <div class="card-actions">
+                <button onclick="prepareEdit(${seriesIndex})">Edit</button>
+                <button onclick="removeSeries(${seriesIndex})">Remove</button>
+            </div>
+        `;
+        seriesList.appendChild(seriesCard);
+    });
+}
 
         function prepareEdit(index) {
             const series = seriesData[index];
