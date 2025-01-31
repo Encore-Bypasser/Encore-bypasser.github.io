@@ -229,19 +229,55 @@ const GITHUB_CONFIG = {
 let seriesData = [];
 let editingIndex = null;
 
+// Helper function for safely getting DOM elements
+function getElement(id) {
+    const element = document.getElementById(id);
+    if (!element) {
+        console.warn(`Element with id '${id}' not found`);
+        return null;
+    }
+    return element;
+}
+
 // Authentication Functions
 function updateLoginStatus() {
     const isLoggedIn = !!token;
-    document.getElementById('userStatus').textContent = isLoggedIn ? 'Logged in as Admin' : 'Not logged in';
-    document.getElementById('loginBtn').classList.toggle('hidden', isLoggedIn);
-    document.getElementById('logoutBtn').classList.toggle('hidden', !isLoggedIn);
-    document.getElementById('adminSection').classList.toggle('hidden', !isLoggedIn);
-    document.getElementById('currentSeriesSection').classList.toggle('hidden', !isLoggedIn);
+    
+    const userStatus = getElement('userStatus');
+    const loginBtn = getElement('loginBtn');
+    const logoutBtn = getElement('logoutBtn');
+    const adminSection = getElement('adminSection');
+    const currentSeriesSection = getElement('currentSeriesSection');
+
+    if (userStatus) {
+        userStatus.textContent = isLoggedIn ? 'Logged in as Admin' : 'Not logged in';
+    }
+    
+    if (loginBtn) {
+        loginBtn.classList.toggle('hidden', isLoggedIn);
+    }
+    
+    if (logoutBtn) {
+        logoutBtn.classList.toggle('hidden', !isLoggedIn);
+    }
+    
+    if (adminSection) {
+        adminSection.classList.toggle('hidden', !isLoggedIn);
+    }
+    
+    if (currentSeriesSection) {
+        currentSeriesSection.classList.toggle('hidden', !isLoggedIn);
+    }
 }
 
 async function login() {
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
+    const username = getElement('username')?.value;
+    const password = getElement('password')?.value;
+
+    if (!username || !password) {
+        alert('Please enter both username and password');
+        return;
+    }
 
     try {
         const response = await fetch(`${API_URL}/login`, {
@@ -273,7 +309,10 @@ function logout() {
     token = null;
     localStorage.removeItem('token');
     updateLoginStatus();
-    document.getElementById('seriesList').innerHTML = '';
+    const seriesList = getElement('seriesList');
+    if (seriesList) {
+        seriesList.innerHTML = '';
+    }
 }
 
 // Pending Requests Functions
@@ -299,7 +338,9 @@ async function loadPendingRequests() {
 }
 
 function displayPendingRequests(requests) {
-    const container = document.getElementById('pendingRequests');
+    const container = getElement('pendingRequests');
+    if (!container) return;
+
     container.innerHTML = requests.length === 0 ? 
         '<p>No pending requests</p>' : 
         requests.map(request => `
@@ -316,6 +357,8 @@ function displayPendingRequests(requests) {
 }
 
 async function approveRequest(requestId) {
+    if (!token) return;
+
     try {
         const response = await fetch(`${API_URL}/approve-request`, {
             method: 'POST',
@@ -340,6 +383,8 @@ async function approveRequest(requestId) {
 }
 
 async function rejectRequest(requestId) {
+    if (!token) return;
+
     try {
         const response = await fetch(`${API_URL}/reject-request`, {
             method: 'POST',
@@ -362,10 +407,13 @@ async function rejectRequest(requestId) {
     }
 }
 
-// Existing Series Data Functions
+// Series Management Functions
 async function loadSeriesData() {
     if (!token) {
-        document.getElementById('seriesList').innerHTML = '';
+        const seriesList = getElement('seriesList');
+        if (seriesList) {
+            seriesList.innerHTML = '';
+        }
         return;
     }
 
@@ -377,7 +425,6 @@ async function loadSeriesData() {
         seriesData = await response.json();
     } catch (error) {
         console.error('Error loading series data:', error);
-        // Fallback to default data if fetch fails
         seriesData = [
             {
                 "series": "The Knight King Who Returned with a God [ Default]",
@@ -391,11 +438,8 @@ async function loadSeriesData() {
 }
 
 function renderSeriesList() {
-    const seriesList = document.getElementById('seriesList');
-    if (!seriesList) {
-        console.error('seriesList element not found');
-        return;
-    }
+    const seriesList = getElement('seriesList');
+    if (!seriesList) return;
 
     seriesList.innerHTML = '';
 
@@ -437,21 +481,46 @@ function renderSeriesList() {
 function prepareEdit(index) {
     const series = seriesData[index];
     editingIndex = index;
-    document.getElementById('seriesName').value = series.series;
+    
+    const seriesNameInput = getElement('seriesName');
+    const chapterInput = getElement('chapter');
+    const startNumberInput = getElement('startNumber');
+    const frameCountInput = getElement('frameCount');
+    const filePatternInput = getElement('filePattern');
+    const addButton = getElement('addButton');
+    
+    if (!seriesNameInput || !chapterInput || !startNumberInput || !frameCountInput || !filePatternInput || !addButton) {
+        console.error('Required form elements not found');
+        return;
+    }
+
+    seriesNameInput.value = series.series;
     const chapter = series.chapters[0];
-    document.getElementById('chapter').value = chapter.chapter;
-    document.getElementById('startNumber').value = chapter.startNumber;
-    document.getElementById('frameCount').value = chapter.frameCount;
-    document.getElementById('filePattern').value = chapter.filePattern || "01-optimized.webp";
-    document.getElementById('addButton').textContent = 'Update Series';
+    chapterInput.value = chapter.chapter;
+    startNumberInput.value = chapter.startNumber;
+    frameCountInput.value = chapter.frameCount;
+    filePatternInput.value = chapter.filePattern || "01-optimized.webp";
+    addButton.textContent = 'Update Series';
 }
 
 function addSeries() {
-    const seriesName = document.getElementById('seriesName').value.trim();
-    const chapter = parseInt(document.getElementById('chapter').value);
-    const startNumber = parseInt(document.getElementById('startNumber').value);
-    const frameCount = parseInt(document.getElementById('frameCount').value);
-    const filePattern = document.getElementById('filePattern').value.trim() || "01-optimized.webp";
+    const seriesNameInput = getElement('seriesName');
+    const chapterInput = getElement('chapter');
+    const startNumberInput = getElement('startNumber');
+    const frameCountInput = getElement('frameCount');
+    const filePatternInput = getElement('filePattern');
+    const addButton = getElement('addButton');
+
+    if (!seriesNameInput || !chapterInput || !startNumberInput || !frameCountInput || !filePatternInput) {
+        alert('Required form elements not found');
+        return;
+    }
+
+    const seriesName = seriesNameInput.value.trim();
+    const chapter = parseInt(chapterInput.value);
+    const startNumber = parseInt(startNumberInput.value);
+    const frameCount = parseInt(frameCountInput.value);
+    const filePattern = filePatternInput.value.trim() || "01-optimized.webp";
 
     if (!seriesName || isNaN(chapter) || isNaN(startNumber) || isNaN(frameCount)) {
         alert('Please fill in all fields correctly.');
@@ -464,7 +533,9 @@ function addSeries() {
             "chapters": [{ chapter, startNumber, frameCount, filePattern }]
         };
         editingIndex = null;
-        document.getElementById('addButton').textContent = 'Add Series';
+        if (addButton) {
+            addButton.textContent = 'Add Series';
+        }
     } else {
         seriesData.push({
             "series": seriesName,
@@ -512,12 +583,23 @@ async function saveToJson() {
 
 // Request Submission Function
 async function submitRequest() {
+    const seriesName = getElement('seriesName')?.value;
+    const chapter = getElement('chapter')?.value;
+    const startNumber = getElement('startNumber')?.value;
+    const frameCount = getElement('frameCount')?.value;
+    const filePattern = getElement('filePattern')?.value || "01-optimized.webp";
+
+    if (!seriesName || !chapter || !startNumber || !frameCount) {
+        alert('Please fill in all required fields');
+        return;
+    }
+
     const request = {
-        series: document.getElementById('seriesName').value,
-        chapter: document.getElementById('chapter').value,
-        startNumber: document.getElementById('startNumber').value,
-        frameCount: document.getElementById('frameCount').value,
-        filePattern: document.getElementById('filePattern').value || "01-optimized.webp",
+        series: seriesName,
+        chapter: chapter,
+        startNumber: startNumber,
+        frameCount: frameCount,
+        filePattern: filePattern,
         id: Date.now().toString()
     };
 
@@ -546,15 +628,40 @@ async function submitRequest() {
 
 // Modal Functions
 function showLoginModal() {
-    document.getElementById('loginModal').style.display = 'block';
+    const loginModal = getElement('loginModal');
+    if (loginModal) {
+        loginModal.style.display = 'block';
+    }
 }
 
 function hideLoginModal() {
-    document.getElementById('loginModal').style.display = 'none';
+    const loginModal = getElement('loginModal');
+    if (loginModal) {
+        loginModal.style.display = 'none';
+    }
 }
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+    const requiredElements = [
+        'userStatus',
+        'loginBtn',
+        'logoutBtn',
+        'adminSection',
+        'currentSeriesSection',
+        'loginModal',
+        'seriesList',
+        'pendingRequests'
+    ];
+
+    const missingElements = requiredElements.filter(id => !document.getElementById(id));
+    
+    if (missingElements.length > 0) {
+        console.error('Missing required elements:', missingElements);
+        alert('Error: Some required page elements are missing. The application may not function correctly.');
+        return;
+    }
+
     updateLoginStatus();
     if (token) {
         loadSeriesData();
