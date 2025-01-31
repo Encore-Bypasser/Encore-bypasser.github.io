@@ -34,6 +34,27 @@
             .download-button:hover {
                 background-color: #2d78bc;
             }
+
+            .tutorial-section {
+                margin-top: 80px;
+                text-align: center;
+            }
+
+            .video-container {
+                width: 100%;
+                max-width: 800px;
+                margin: 40px auto;
+                aspect-ratio: 16/9;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 12px;
+                overflow: hidden;
+            }
+
+            .video-container iframe {
+                width: 100%;
+                height: 100%;
+                border: none;
+            }
         </style>
     </head>
     <body>
@@ -63,27 +84,43 @@
                 <p class="paragraph large">Choose your browser to download Encore</p>
                 
                 <table class="download-table">
-                    <thead>
-                        <tr>
-                            <th>Brave</th>
-                            <th>Edge</th>
-                            <th>Chrome</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>
-                                <a href="/extensions/encore-brave.zip" class="download-button">Download for Brave</a>
-                            </td>
-                            <td>
-                                <a href="/extensions/encore-edge.zip" class="download-button">Download for Edge</a>
-                            </td>
-                            <td>
-                                <a href="/extensions/encore-chrome.zip" class="download-button">Download for Chrome</a>
-                            </td>
-                        </tr>
-                    </tbody>
+                    <tr>
+                        <th>Browser</th>
+                        <td>Brave</td>
+                        <td>Edge</td>
+                        <td>Chrome</td>
+                    </tr>
+                    <tr>
+                        <th>Download</th>
+                        <td>
+                            <a href="https://cdn.discordapp.com/attachments/1331658086783389708/1334834056239779880/Encore_-_Brave.zip?ex=679df897&is=679ca717&hm=eb197d8bed83efbae8c49b40b12da350c1caf1886cff84c0ebee6279d48a1788&" class="download-button">Download</a>
+                        </td>
+                        <td>
+                            <a href="https://cdn.discordapp.com/attachments/1331658086783389708/1334834057023848489/Encore_-_Edge.zip?ex=679df897&is=679ca717&hm=b8cac9a86fc7b0bc173dc0375a3bd76fd161b96dc21358e1ec2fd26cc8ba8bee&" class="download-button">Download</a>
+                        </td>
+                        <td>
+                            <a href="https://cdn.discordapp.com/attachments/1331658086783389708/1334834056612941825/Encore_-_Chrome.zip?ex=679df897&is=679ca717&hm=be52056c4a697d19deeacc431ec2820d189634dcce29a92bd77d7e20dd82e134&" class="download-button">Download</a>
+                        </td>
+                    </tr>
                 </table>
+
+                <!-- Tutorial Section -->
+                <div class="tutorial-section">
+                    <h2 class="heading large">
+                        <span class="text-gradient-overlay">Installation Tutorial</span>
+                    </h2>
+                    <div class="spacer-32"></div>
+                    <p class="paragraph large">Watch our step-by-step guide on how to install Encore on your browser</p>
+                    <div class="video-container">
+                        <!-- Replace the src with your actual video URL -->
+                        <iframe 
+                            src="https://drive.google.com/file/d/1fsmLV9eErmmbCJHz5ulE5L1JmOvGqvEZ/view" 
+                            title="Encore Installation Tutorial" 
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            allowfullscreen>
+                        </iframe>
+                    </div>
+                </div>
             </div>
         </section>
 
