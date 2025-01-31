@@ -321,7 +321,7 @@ let token = localStorage.getItem('token');
     // Series Data Management
     async function loadSeriesData() {
         try {
-            const response = await fetch('chapters.json');
+            const response = await fetch('https://raw.githubusercontent.com/Psycho980/Psycho980.github.io/refs/heads/main/chapters.json');
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
