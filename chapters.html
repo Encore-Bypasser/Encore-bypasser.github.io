@@ -3,6 +3,341 @@
 <head>
     <meta charset="UTF-8">
     <title>Chapter Management</title>
+    <script>
+        const API_URL = 'https://mountainous-young-raven.glitch.me';
+        let token = localStorage.getItem('token');
+        const GITHUB_CONFIG = {
+            REPO: 'psycho980/psycho980.github.io',
+            BRANCH: 'main'
+        };
+        let seriesData = [];
+        let editingIndex = null;
+
+        // Authentication Functions
+        function updateLoginStatus() {
+            const isLoggedIn = !!token;
+            document.getElementById('userStatus').textContent = isLoggedIn ? 'Logged in as Admin' : 'Not logged in';
+            document.getElementById('loginBtn').classList.toggle('hidden', isLoggedIn);
+            document.getElementById('logoutBtn').classList.toggle('hidden', !isLoggedIn);
+            document.getElementById('adminSection').classList.toggle('hidden', !isLoggedIn);
+        }
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    token = data.token;
+                    localStorage.setItem('token', token);
+                    hideLoginModal();
+                    updateLoginStatus();
+                    loadPendingRequests();
+                } else {
+                    alert('Invalid credentials');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Error during login');
+            }
+        }
+
+        function logout() {
+            token = null;
+            localStorage.removeItem('token');
+            updateLoginStatus();
+        }
+
+        // Pending Requests Functions
+        async function loadPendingRequests() {
+            if (!token) return;
+
+            try {
+                const response = await fetch(`${API_URL}/pending-requests`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const requests = await response.json();
+                    displayPendingRequests(requests);
+                } else {
+                    console.error('Error loading pending requests');
+                }
+            } catch (error) {
+                console.error('Load pending requests error:', error);
+            }
+        }
+
+        function displayPendingRequests(requests) {
+            const container = document.getElementById('pendingRequests');
+            container.innerHTML = requests.length === 0 ? 
+                '<p>No pending requests</p>' : 
+                requests.map(request => `
+                    <div class="request-item">
+                        <p>Series: ${request.series}</p>
+                        <p>Chapter: ${request.chapter}</p>
+                        <p>Start Number: ${request.startNumber}</p>
+                        <p>Frame Count: ${request.frameCount}</p>
+                        <p>File Pattern: ${request.filePattern}</p>
+                        <button onclick="approveRequest('${request.id}')">Approve</button>
+                        <button onclick="rejectRequest('${request.id}')">Reject</button>
+                    </div>
+                `).join('');
+        }
+
+        async function approveRequest(requestId) {
+            try {
+                const response = await fetch(`${API_URL}/approve-request`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ requestId })
+                });
+
+                if (response.ok) {
+                    alert('Request approved');
+                    loadPendingRequests();
+                    loadSeriesData();
+                } else {
+                    alert('Error approving request');
+                }
+            } catch (error) {
+                console.error('Approve request error:', error);
+                alert('Error approving request');
+            }
+        }
+
+        async function rejectRequest(requestId) {
+            try {
+                const response = await fetch(`${API_URL}/reject-request`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ requestId })
+                });
+
+                if (response.ok) {
+                    alert('Request rejected');
+                    loadPendingRequests();
+                } else {
+                    alert('Error rejecting request');
+                }
+            } catch (error) {
+                console.error('Reject request error:', error);
+                alert('Error rejecting request');
+            }
+        }
+
+        // Existing Series Data Functions
+        async function loadSeriesData() {
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/Psycho980/Psycho980.github.io/refs/heads/main/chapters.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                seriesData = await response.json();
+            } catch (error) {
+                console.error('Error loading series data:', error);
+                // Fallback to default data if fetch fails
+                seriesData = [
+                    {
+                        "series": "The Knight King Who Returned with a God [ Default]",
+                        "chapters": [
+                            { "chapter": 96, "startNumber": 266584, "frameCount": 10, "filePattern": "01-optimized.webp" }
+                        ]
+                    }
+                ];
+            }
+            renderSeriesList();
+        }
+
+        function renderSeriesList() {
+            const seriesList = document.getElementById('seriesList');
+            if (!seriesList) {
+                console.error('seriesList element not found');
+                return;
+            }
+
+            seriesList.innerHTML = '';
+
+            if (seriesData.length === 0) {
+                seriesList.innerHTML = '<p>No series data available.</p>';
+                return;
+            }
+
+            seriesData.forEach((series, seriesIndex) => {
+                const seriesCard = document.createElement('div');
+                seriesCard.className = 'card';
+                seriesCard.innerHTML = `
+                    <div class="card__title">${series.series}</div>
+                    <div class="card__data">
+                        <div class="card__left">
+                            <div class="item">Chapter</div>
+                            <div class="item">Start Number</div>
+                            <div class="item">Frame Count</div>
+                            <div class="item">File Pattern</div>
+                        </div>
+                        <div class="card__right">
+                            ${series.chapters.map(chapter => `
+                                <div class="item">${chapter.chapter}</div>
+                                <div class="item">${chapter.startNumber}</div>
+                                <div class="item">${chapter.frameCount}</div>
+                                <div class="item">${chapter.filePattern || "01-optimized.webp"}</div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <button onclick="prepareEdit(${seriesIndex})">Edit</button>
+                        <button onclick="removeSeries(${seriesIndex})">Remove</button>
+                    </div>
+                `;
+                seriesList.appendChild(seriesCard);
+            });
+        }
+
+        function prepareEdit(index) {
+            const series = seriesData[index];
+            editingIndex = index;
+            document.getElementById('seriesName').value = series.series;
+            const chapter = series.chapters[0];
+            document.getElementById('chapter').value = chapter.chapter;
+            document.getElementById('startNumber').value = chapter.startNumber;
+            document.getElementById('frameCount').value = chapter.frameCount;
+            document.getElementById('filePattern').value = chapter.filePattern || "01-optimized.webp";
+            document.getElementById('addButton').textContent = 'Update Series';
+        }
+
+        function addSeries() {
+            const seriesName = document.getElementById('seriesName').value.trim();
+            const chapter = parseInt(document.getElementById('chapter').value);
+            const startNumber = parseInt(document.getElementById('startNumber').value);
+            const frameCount = parseInt(document.getElementById('frameCount').value);
+            const filePattern = document.getElementById('filePattern').value.trim() || "01-optimized.webp";
+
+            if (!seriesName || isNaN(chapter) || isNaN(startNumber) || isNaN(frameCount)) {
+                alert('Please fill in all fields correctly.');
+                return;
+            }
+
+            if (editingIndex !== null) {
+                seriesData[editingIndex] = {
+                    "series": seriesName,
+                    "chapters": [{ chapter, startNumber, frameCount, filePattern }]
+                };
+                editingIndex = null;
+                document.getElementById('addButton').textContent = 'Add Series';
+            } else {
+                seriesData.push({
+                    "series": seriesName,
+                    "chapters": [{ chapter, startNumber, frameCount, filePattern }]
+                });
+            }
+            renderSeriesList();
+            saveToJson();
+        }
+
+        function removeSeries(seriesIndex) {
+            if (confirm('Are you sure you want to remove this series?')) {
+                seriesData.splice(seriesIndex, 1);
+                renderSeriesList();
+                saveToJson();
+            }
+        }
+
+        async function saveToJson() {
+            const jsonContent = JSON.stringify(seriesData, null, 2);
+            const base64Content = btoa(unescape(encodeURIComponent(jsonContent)));
+
+            try {
+                const response = await fetch(`${API_URL}/chapter`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        content: base64Content,
+                        sha: 'existing-file-sha'
+                    })
+                });
+
+                if (response.ok) {
+                    alert('Successfully updated chapters.json on GitHub!');
+                } else {
+                    alert('Failed to update chapters.json.');
+                }
+            } catch (error) {
+                console.error('Save to JSON error:', error);
+                alert('Error updating chapters.json');
+            }
+        }
+
+        // Request Submission Function
+        async function submitRequest() {
+            const request = {
+                series: document.getElementById('seriesName').value,
+                chapter: document.getElementById('chapter').value,
+                startNumber: document.getElementById('startNumber').value,
+                frameCount: document.getElementById('frameCount').value,
+                filePattern: document.getElementById('filePattern').value || "01-optimized.webp",
+                id: Date.now().toString()
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/request`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(request)
+                });
+
+                if (response.ok) {
+                    alert('Request submitted successfully');
+                    if (token) {
+                        loadPendingRequests();
+                    }
+                } else {
+                    alert('Error submitting request');
+                }
+            } catch (error) {
+                console.error('Submit error:', error);
+                alert('Error submitting request');
+            }
+        }
+
+        // Modal and Login Functions
+        function showLoginModal() {
+            document.getElementById('loginModal').style.display = 'block';
+        }
+
+        function hideLoginModal() {
+            document.getElementById('loginModal').style.display = 'none';
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateLoginStatus();
+            loadSeriesData();
+            if (token) {
+                loadPendingRequests();
+            }
+        });
+    </script>
     <style>
         body {
             font-family: "Courier New", Courier, monospace;
@@ -218,455 +553,4 @@
         <!-- Will be populated dynamically -->
     </div>
 </body>
-
-    <script>
-const API_URL = 'https://mountainous-young-raven.glitch.me';
-let token = localStorage.getItem('token');
-const GITHUB_CONFIG = {
-    REPO: 'psycho980/psycho980.github.io',
-    BRANCH: 'main'
-};
-let seriesData = [];
-let editingIndex = null;
-
-// Helper function for safely getting DOM elements
-function getElement(id) {
-    const element = document.getElementById(id);
-    if (!element) {
-        console.warn(`Element with id '${id}' not found`);
-        return null;
-    }
-    return element;
-}
-
-// Authentication Functions
-function updateLoginStatus() {
-    const isLoggedIn = !!token;
-    
-    const userStatus = getElement('userStatus');
-    const loginBtn = getElement('loginBtn');
-    const logoutBtn = getElement('logoutBtn');
-    const adminSection = getElement('adminSection');
-    const currentSeriesSection = getElement('currentSeriesSection');
-
-    if (userStatus) {
-        userStatus.textContent = isLoggedIn ? 'Logged in as Admin' : 'Not logged in';
-    }
-    
-    if (loginBtn) {
-        loginBtn.classList.toggle('hidden', isLoggedIn);
-    }
-    
-    if (logoutBtn) {
-        logoutBtn.classList.toggle('hidden', !isLoggedIn);
-    }
-    
-    if (adminSection) {
-        adminSection.classList.toggle('hidden', !isLoggedIn);
-    }
-    
-    if (currentSeriesSection) {
-        currentSeriesSection.classList.toggle('hidden', !isLoggedIn);
-    }
-}
-
-async function login() {
-    const username = getElement('username')?.value;
-    const password = getElement('password')?.value;
-
-    if (!username || !password) {
-        alert('Please enter both username and password');
-        return;
-    }
-
-    try {
-        const response = await fetch(`${API_URL}/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username, password })
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            token = data.token;
-            localStorage.setItem('token', token);
-            hideLoginModal();
-            updateLoginStatus();
-            loadPendingRequests();
-            loadSeriesData();
-        } else {
-            alert('Invalid credentials');
-        }
-    } catch (error) {
-        console.error('Login error:', error);
-        alert('Error during login');
-    }
-}
-
-function logout() {
-    token = null;
-    localStorage.removeItem('token');
-    updateLoginStatus();
-    const seriesList = getElement('seriesList');
-    if (seriesList) {
-        seriesList.innerHTML = '';
-    }
-}
-
-// Pending Requests Functions
-async function loadPendingRequests() {
-    if (!token) return;
-
-    try {
-        const response = await fetch(`${API_URL}/pending-requests`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        if (response.ok) {
-            const requests = await response.json();
-            displayPendingRequests(requests);
-        } else {
-            console.error('Error loading pending requests');
-        }
-    } catch (error) {
-        console.error('Load pending requests error:', error);
-    }
-}
-
-function displayPendingRequests(requests) {
-    const container = getElement('pendingRequests');
-    if (!container) return;
-
-    container.innerHTML = requests.length === 0 ? 
-        '<p>No pending requests</p>' : 
-        requests.map(request => `
-            <div class="request-item">
-                <p>Series: ${request.series}</p>
-                <p>Chapter: ${request.chapter}</p>
-                <p>Start Number: ${request.startNumber}</p>
-                <p>Frame Count: ${request.frameCount}</p>
-                <p>File Pattern: ${request.filePattern}</p>
-                <button onclick="approveRequest('${request.id}')">Approve</button>
-                <button onclick="rejectRequest('${request.id}')">Reject</button>
-            </div>
-        `).join('');
-}
-
-async function approveRequest(requestId) {
-    if (!token) return;
-
-    try {
-        const response = await fetch(`${API_URL}/approve-request`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ requestId })
-        });
-
-        if (response.ok) {
-            alert('Request approved');
-            loadPendingRequests();
-            loadSeriesData();
-        } else {
-            alert('Error approving request');
-        }
-    } catch (error) {
-        console.error('Approve request error:', error);
-        alert('Error approving request');
-    }
-}
-
-async function rejectRequest(requestId) {
-    if (!token) return;
-
-    try {
-        const response = await fetch(`${API_URL}/reject-request`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ requestId })
-        });
-
-        if (response.ok) {
-            alert('Request rejected');
-            loadPendingRequests();
-        } else {
-            alert('Error rejecting request');
-        }
-    } catch (error) {
-        console.error('Reject request error:', error);
-        alert('Error rejecting request');
-    }
-}
-
-// Series Management Functions
-async function loadSeriesData() {
-    if (!token) {
-        const seriesList = getElement('seriesList');
-        if (seriesList) {
-            seriesList.innerHTML = '';
-        }
-        return;
-    }
-
-    try {
-        const response = await fetch('https://raw.githubusercontent.com/Psycho980/Psycho980.github.io/refs/heads/main/chapters.json');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        seriesData = await response.json();
-    } catch (error) {
-        console.error('Error loading series data:', error);
-        seriesData = [
-            {
-                "series": "The Knight King Who Returned with a God [ Default]",
-                "chapters": [
-                    { "chapter": 96, "startNumber": 266584, "frameCount": 10, "filePattern": "01-optimized.webp" }
-                ]
-            }
-        ];
-    }
-    renderSeriesList();
-}
-
-function renderSeriesList() {
-    const seriesList = getElement('seriesList');
-    if (!seriesList) return;
-
-    seriesList.innerHTML = '';
-
-    if (seriesData.length === 0) {
-        seriesList.innerHTML = '<p>No series data available.</p>';
-        return;
-    }
-
-    seriesData.forEach((series, seriesIndex) => {
-        const seriesCard = document.createElement('div');
-        seriesCard.className = 'card';
-        seriesCard.innerHTML = `
-            <div class="card__title">${series.series}</div>
-            <div class="card__data">
-                <div class="card__left">
-                    <div class="item">Chapter</div>
-                    <div class="item">Start Number</div>
-                    <div class="item">Frame Count</div>
-                    <div class="item">File Pattern</div>
-                </div>
-                <div class="card__right">
-                    ${series.chapters.map(chapter => `
-                        <div class="item">${chapter.chapter}</div>
-                        <div class="item">${chapter.startNumber}</div>
-                        <div class="item">${chapter.frameCount}</div>
-                        <div class="item">${chapter.filePattern || "01-optimized.webp"}</div>
-                    `).join('')}
-                </div>
-            </div>
-            <div class="card-actions">
-                <button onclick="prepareEdit(${seriesIndex})">Edit</button>
-                <button onclick="removeSeries(${seriesIndex})">Remove</button>
-            </div>
-        `;
-        seriesList.appendChild(seriesCard);
-    });
-}
-
-function prepareEdit(index) {
-    const series = seriesData[index];
-    editingIndex = index;
-    
-    const seriesNameInput = getElement('seriesName');
-    const chapterInput = getElement('chapter');
-    const startNumberInput = getElement('startNumber');
-    const frameCountInput = getElement('frameCount');
-    const filePatternInput = getElement('filePattern');
-    const addButton = getElement('addButton');
-    
-    if (!seriesNameInput || !chapterInput || !startNumberInput || !frameCountInput || !filePatternInput || !addButton) {
-        console.error('Required form elements not found');
-        return;
-    }
-
-    seriesNameInput.value = series.series;
-    const chapter = series.chapters[0];
-    chapterInput.value = chapter.chapter;
-    startNumberInput.value = chapter.startNumber;
-    frameCountInput.value = chapter.frameCount;
-    filePatternInput.value = chapter.filePattern || "01-optimized.webp";
-    addButton.textContent = 'Update Series';
-}
-
-function addSeries() {
-    const seriesNameInput = getElement('seriesName');
-    const chapterInput = getElement('chapter');
-    const startNumberInput = getElement('startNumber');
-    const frameCountInput = getElement('frameCount');
-    const filePatternInput = getElement('filePattern');
-    const addButton = getElement('addButton');
-
-    if (!seriesNameInput || !chapterInput || !startNumberInput || !frameCountInput || !filePatternInput) {
-        alert('Required form elements not found');
-        return;
-    }
-
-    const seriesName = seriesNameInput.value.trim();
-    const chapter = parseInt(chapterInput.value);
-    const startNumber = parseInt(startNumberInput.value);
-    const frameCount = parseInt(frameCountInput.value);
-    const filePattern = filePatternInput.value.trim() || "01-optimized.webp";
-
-    if (!seriesName || isNaN(chapter) || isNaN(startNumber) || isNaN(frameCount)) {
-        alert('Please fill in all fields correctly.');
-        return;
-    }
-
-    if (editingIndex !== null) {
-        seriesData[editingIndex] = {
-            "series": seriesName,
-            "chapters": [{ chapter, startNumber, frameCount, filePattern }]
-        };
-        editingIndex = null;
-        if (addButton) {
-            addButton.textContent = 'Add Series';
-        }
-    } else {
-        seriesData.push({
-            "series": seriesName,
-            "chapters": [{ chapter, startNumber, frameCount, filePattern }]
-        });
-    }
-    renderSeriesList();
-    saveToJson();
-}
-
-function removeSeries(seriesIndex) {
-    if (confirm('Are you sure you want to remove this series?')) {
-        seriesData.splice(seriesIndex, 1);
-        renderSeriesList();
-        saveToJson();
-    }
-}
-
-async function saveToJson() {
-    const jsonContent = JSON.stringify(seriesData, null, 2);
-    const base64Content = btoa(unescape(encodeURIComponent(jsonContent)));
-
-    try {
-        const response = await fetch(`${API_URL}/chapter`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                content: base64Content,
-                sha: 'existing-file-sha'
-            })
-        });
-
-        if (response.ok) {
-            alert('Successfully updated chapters.json on GitHub!');
-        } else {
-            alert('Failed to update chapters.json.');
-        }
-    } catch (error) {
-        console.error('Save to JSON error:', error);
-        alert('Error updating chapters.json');
-    }
-}
-
-// Request Submission Function
-async function submitRequest() {
-    const seriesName = getElement('seriesName')?.value;
-    const chapter = getElement('chapter')?.value;
-    const startNumber = getElement('startNumber')?.value;
-    const frameCount = getElement('frameCount')?.value;
-    const filePattern = getElement('filePattern')?.value || "01-optimized.webp";
-
-    if (!seriesName || !chapter || !startNumber || !frameCount) {
-        alert('Please fill in all required fields');
-        return;
-    }
-
-    const request = {
-        series: seriesName,
-        chapter: chapter,
-        startNumber: startNumber,
-        frameCount: frameCount,
-        filePattern: filePattern,
-        id: Date.now().toString()
-    };
-
-    try {
-        const response = await fetch(`${API_URL}/request`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(request)
-        });
-
-        if (response.ok) {
-            alert('Request submitted successfully');
-            if (token) {
-                loadPendingRequests();
-            }
-        } else {
-            alert('Error submitting request');
-        }
-    } catch (error) {
-        console.error('Submit error:', error);
-        alert('Error submitting request');
-    }
-}
-
-// Modal Functions
-function showLoginModal() {
-    const loginModal = getElement('loginModal');
-    if (loginModal) {
-        loginModal.style.display = 'block';
-    }
-}
-
-function hideLoginModal() {
-    const loginModal = getElement('loginModal');
-    if (loginModal) {
-        loginModal.style.display = 'none';
-    }
-}
-
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
-    const requiredElements = [
-        'userStatus',
-        'loginBtn',
-        'logoutBtn',
-        'adminSection',
-        'currentSeriesSection',
-        'loginModal',
-        'seriesList',
-        'pendingRequests'
-    ];
-
-    const missingElements = requiredElements.filter(id => !document.getElementById(id));
-    
-    if (missingElements.length > 0) {
-        console.error('Missing required elements:', missingElements);
-        alert('Error: Some required page elements are missing. The application may not function correctly.');
-        return;
-    }
-
-    updateLoginStatus();
-    if (token) {
-        loadSeriesData();
-        loadPendingRequests();
-    }
-});
-    </script>
 </html>
